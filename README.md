@@ -1,6 +1,7 @@
 # AST-Query 🐍
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python Version](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+
 An interactive command-line tool to query the Abstract Syntax Tree (AST) of Python code using a simple, powerful query language. It's like `grep` or `SQL` for your code's structure.
 
 ## The Problem
