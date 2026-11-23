@@ -193,7 +193,7 @@ ast_query/
   parser.py     reading source files and walking directories
   cli.py        the astq command
 docs/
-  index.html    the browser playground (deployed to GitHub Pages)
+  index.html    the browser playground (served by GitHub Pages)
   demo.svg      the terminal screenshot above
 examples/
   example.py    a small file to try queries on
@@ -214,7 +214,7 @@ python -m http.server 8000
 # then open http://localhost:8000/docs/
 ```
 
-GitHub Actions run the tests on Python 3.9 to 3.13 for every push. On each push to `main`, the playground is redeployed to GitHub Pages. In the repo settings, under **Settings → Pages → Source**, choose **GitHub Actions** once.
+GitHub Actions run the tests on Python 3.9 to 3.13 for every push. The playground is served by GitHub Pages from the `docs/` folder (**Settings → Pages → Deploy from a branch → `main` / `/docs`**). The page loads the `ast_query` package files from this repository through jsDelivr, so it always runs the code on `main`.
 
 ## Possible extensions
 

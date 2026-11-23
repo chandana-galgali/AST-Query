@@ -621,17 +621,20 @@ $("chips").addEventListener("click", (e) => {
 
 async function fetchPackage() {
   const files = ["__init__.py", "query.py", "matcher.py", "parser.py"];
-  for (const base of ["./ast_query/", "../ast_query/"]) {
+  // 1) next to the page, 2) repo root when previewing locally, 3) straight from GitHub
+  // (needed when Pages serves only the docs/ folder).
+  const sources = ["./ast_query/", "../ast_query/", "https://cdn.jsdelivr.net/gh/chandana-galgali/AST-Query@main/ast_query/"];
+  for (const base of sources) {
     try {
       const texts = await Promise.all(files.map(async f => {
-        const r = await fetch(base + f, { cache: "no-cache" });
+        const r = await fetch(base + f, base.startsWith("http") ? {} : { cache: "no-cache" });
         if (!r.ok) throw new Error(r.status);
         return r.text();
       }));
       return Object.fromEntries(files.map((f, i) => [f, texts[i]]));
     } catch { /* try next location */ }
   }
-  throw new Error("Couldn't load the ast_query package files. Serve the repository root (python -m http.server) and open /docs/.");
+  throw new Error("Couldn't load the ast_query package files. Check your connection, or serve the repository root locally (python -m http.server) and open /docs/.");
 }
 
 (async function boot() {
