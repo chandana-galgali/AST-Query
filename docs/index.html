@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AST-Query · grep for the shape of Python code</title>
+<meta name="description" content="Query the abstract syntax tree of Python code with a small, readable query language. Try it live in your browser.">
+<meta property="og:title" content="AST-Query">
+<meta property="og:description" content="grep for the shape of Python code. Live playground running in your browser.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23141210'/><path d='M16 6v6M16 12l-7 7M16 12l7 7M9 19v5M23 19v5' stroke='%23ff6a3d' stroke-width='2.6' stroke-linecap='round' fill='none'/><circle cx='16' cy='6' r='2.6' fill='%23ece4d6'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0e0c;
+    --panel: #161411;
+    --panel-2: #1c1915;
+    --line: #2b2721;
+    --line-2: #3a342b;
+    --text: #ece4d6;
+    --muted: #8f8676;
+    --faint: #5c554a;
+    --accent: #ff6a3d;
+    --accent-soft: rgba(255, 106, 61, 0.16);
+    --accent-mid: rgba(255, 106, 61, 0.30);
+    --amber: #e8c468;
+    --green: #9bc48a;
+    --blue: #8fb3d9;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --serif: "Instrument Serif", Georgia, serif;
+    --code-size: 13.5px;
+    --code-lh: 21px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }
+  body {
+    background-image:
+      radial-gradient(1200px 500px at 85% -10%, rgba(255,106,61,0.07), transparent 60%),
+      radial-gradient(900px 400px at -10% 10%, rgba(232,196,104,0.05), transparent 60%);
+    min-height: 100vh;
+  }
+  a { color: inherit; }
+  ::selection { background: var(--accent-mid); }
+
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 0 28px; }
+
+  /* ---------- header ---------- */
+  header.top { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-weight: 700; letter-spacing: -0.02em; text-decoration: none; }
+  .brand svg { width: 26px; height: 26px; }
+  nav.links { display: flex; gap: 22px; font-size: 14px; color: var(--muted); }
+  nav.links a { text-decoration: none; transition: color .15s; }
+  nav.links a:hover { color: var(--text); }
+
+  .hero { padding: 36px 0 26px; display: grid; grid-template-columns: 1.25fr 1fr; gap: 40px; align-items: end; }
+  .hero h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(44px, 6.4vw, 84px); line-height: 0.95; margin: 0; letter-spacing: -0.015em; }
+  .hero h1 em { color: var(--accent); font-style: italic; }
+  .hero p { color: var(--muted); font-size: 16.5px; line-height: 1.6; margin: 0 0 6px; max-width: 46ch; }
+  .hero p code { font-family: var(--mono); font-size: 0.9em; color: var(--text); }
+
+  /* ---------- query bar ---------- */
+  .querybar {
+    display: flex; align-items: center; gap: 0;
+    background: var(--panel); border: 1px solid var(--line-2); border-radius: 14px;
+    padding: 6px 6px 6px 18px; margin-top: 18px;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .querybar:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+  .querybar.error { border-color: #d0583b; }
+  .prompt { font-family: var(--mono); color: var(--accent); font-weight: 700; margin-right: 12px; user-select: none; white-space: nowrap; }
+  #query {
+    flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: var(--text);
+    font-family: var(--mono); font-size: 16px; padding: 12px 0;
+  }
+  .qopts { display: flex; align-items: center; gap: 6px; }
+  .toggle {
+    font-family: var(--mono); font-size: 12px; color: var(--muted); background: transparent;
+    border: 1px solid var(--line-2); border-radius: 8px; padding: 7px 9px; cursor: pointer;
+  }
+  .toggle[aria-pressed="true"] { color: var(--bg); background: var(--amber); border-color: var(--amber); }
+  .run {
+    font-family: var(--sans); font-weight: 600; font-size: 14px; color: #1a0d07; background: var(--accent);
+    border: 0; border-radius: 10px; padding: 11px 18px; cursor: pointer; transition: transform .1s, filter .15s;
+  }
+  .run:hover { filter: brightness(1.08); }
+  .run:active { transform: translateY(1px); }
+  .qmeta { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin: 10px 2px 0; min-height: 22px; font-size: 13px; }
+  #qerror { color: #f08a6c; font-family: var(--mono); font-size: 12.5px; }
+  .status { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+  .status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); animation: pulse 1.2s infinite ease-in-out; }
+  .status.ready .dot { background: var(--green); animation: none; }
+  .status.failed .dot { background: #d0583b; animation: none; }
+  @keyframes pulse { 50% { opacity: .3; } }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 22px; }
+  .chip {
+    font-family: var(--mono); font-size: 12px; color: var(--muted); background: transparent;
+    border: 1px dashed var(--line-2); border-radius: 999px; padding: 6px 12px; cursor: pointer; transition: all .15s;
+  }
+  .chip:hover { color: var(--text); border-color: var(--accent); border-style: solid; }
+  .chip b { color: var(--text); font-weight: 500; }
+
+  /* ---------- workspace ---------- */
+  .workspace { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px; }
+  .pane { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; min-height: 520px; }
+  .pane-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 0 14px; height: 44px; border-bottom: 1px solid var(--line); background: var(--panel-2);
+    font-size: 12.5px; color: var(--muted); font-family: var(--mono);
+  }
+  .pane-head .title { display: flex; align-items: center; gap: 10px; }
+  .dots { display: flex; gap: 6px; }
+  .dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--line-2); display: block; }
+  .ghost { font-family: var(--mono); font-size: 12px; color: var(--muted); background: transparent; border: 0; cursor: pointer; padding: 6px 8px; border-radius: 6px; }
+  .ghost:hover { color: var(--text); background: var(--line); }
+
+  .editor { position: relative; flex: 1; display: flex; min-height: 0; height: 560px; }
+  .gutter {
+    flex: 0 0 auto; padding: 14px 10px 14px 14px; text-align: right; color: var(--faint);
+    font-family: var(--mono); font-size: var(--code-size); line-height: var(--code-lh);
+    overflow: hidden; user-select: none; border-right: 1px solid var(--line); min-width: 48px;
+  }
+  .gutter div.hit { color: var(--accent); }
+  .code-area { position: relative; flex: 1; min-width: 0; }
+  .code-area pre, .code-area textarea {
+    position: absolute; inset: 0; margin: 0; padding: 14px 16px; border: 0;
+    font-family: var(--mono); font-size: var(--code-size); line-height: var(--code-lh);
+    white-space: pre; tab-size: 4; overflow: auto; letter-spacing: 0;
+    font-variant-ligatures: none;
+  }
+  .code-area pre { color: transparent; pointer-events: none; }
+  .code-area pre::-webkit-scrollbar { display: none; }
+  .code-area pre { scrollbar-width: none; }
+  .code-area textarea {
+    background: transparent; color: var(--text); caret-color: var(--accent); resize: none; outline: none;
+  }
+  .code-area textarea::selection { background: rgba(143,179,217,.28); }
+  mark { color: transparent; border-radius: 3px; background: var(--accent-soft); box-shadow: inset 0 -2px 0 rgba(255,106,61,.55); }
+  mark.d2 { background: rgba(255,106,61,.26); }
+  mark.d3 { background: rgba(255,106,61,.36); }
+  mark.sel { background: rgba(232,196,104,.30); box-shadow: inset 0 -2px 0 var(--amber); }
+
+  .tabs { display: flex; gap: 4px; }
+  .tab { font-family: var(--mono); font-size: 12px; color: var(--muted); background: transparent; border: 0; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+  .tab[aria-selected="true"] { color: var(--text); background: var(--line); }
+  .count { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+
+  .results { flex: 1; overflow: auto; height: 560px; }
+  .result {
+    display: grid; grid-template-columns: 70px 1fr; gap: 4px 12px; padding: 11px 16px;
+    border-bottom: 1px solid var(--line); cursor: pointer; transition: background .12s;
+  }
+  .result:hover { background: var(--panel-2); }
+  .result.sel { background: rgba(232,196,104,.07); box-shadow: inset 3px 0 0 var(--amber); }
+  .result .loc { font-family: var(--mono); font-size: 12px; color: var(--green); padding-top: 1px; }
+  .result .type { font-family: var(--mono); font-size: 12px; color: var(--amber); }
+  .result pre { grid-column: 2; margin: 0; font-family: var(--mono); font-size: 12.5px; color: var(--text); white-space: pre; overflow: hidden; text-overflow: ellipsis; max-height: 84px; opacity: .92; }
+  .empty { padding: 40px 24px; color: var(--muted); font-size: 14px; line-height: 1.6; text-align: center; }
+  .empty code { font-family: var(--mono); color: var(--text); }
+  .astview { margin: 0; padding: 14px 16px; font-family: var(--mono); font-size: 12px; line-height: 1.55; color: var(--muted); white-space: pre; overflow: auto; height: 560px; }
+  .astview .k { color: var(--amber); }
+  .astview .a { color: var(--blue); }
+  .astview .s { color: var(--green); }
+
+  .cli-line {
+    display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 14px;
+    border: 1px solid var(--line); border-radius: 10px; font-family: var(--mono); font-size: 12.5px; color: var(--muted);
+    overflow: hidden;
+  }
+  .cli-line code { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+  .cli-line span { color: var(--faint); }
+
+  /* ---------- reference ---------- */
+  section.ref { padding: 72px 0 24px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; color: var(--accent); letter-spacing: .12em; text-transform: uppercase; }
+  section.ref h2 { font-family: var(--serif); font-weight: 400; font-size: 46px; margin: 8px 0 28px; letter-spacing: -0.01em; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .card { border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; background: rgba(22,20,17,.6); }
+  .card h3 { margin: 0 0 14px; font-size: 14px; font-weight: 600; letter-spacing: .01em; }
+  .card table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .card td { padding: 6px 0; vertical-align: top; border-top: 1px solid var(--line); color: var(--muted); }
+  .card tr:first-child td { border-top: 0; }
+  .card td:first-child { font-family: var(--mono); color: var(--text); white-space: nowrap; padding-right: 14px; font-size: 12.5px; }
+  .card p { color: var(--muted); font-size: 13.5px; line-height: 1.6; margin: 0 0 10px; }
+  .card p code, .card li code { font-family: var(--mono); color: var(--text); font-size: 12.5px; }
+
+  .install { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .term { white-space: pre; background: #0b0a09; border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; font-family: var(--mono); font-size: 13px; line-height: 1.75; overflow: auto; }
+  .term .c { color: var(--faint); }
+  .term .p { color: var(--accent); user-select: none; }
+  .term .o { color: var(--muted); }
+  .term .h { color: var(--accent); }
+  .term .g { color: var(--green); }
+  .term .y { color: var(--amber); }
+  .term .m { color: #c49bd9; }
+
+  footer { padding: 48px 0 60px; color: var(--faint); font-size: 13px; display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; border-top: 1px solid var(--line); margin-top: 56px; }
+  footer a { color: var(--muted); }
+
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 13px; opacity: 0; transition: all .2s; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 980px) {
+    .hero { grid-template-columns: 1fr; gap: 16px; }
+    .workspace, .grid3, .install { grid-template-columns: 1fr; }
+    .editor, .results, .astview { height: 420px; }
+  }
+  @media (max-width: 560px) {
+    .wrap { padding: 0 16px; }
+    nav.links a.hide-sm { display: none; }
+    .prompt { display: none; }
+    .querybar { padding-left: 12px; }
+    .toggle { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="#">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#1c1915"/><path d="M16 6v6M16 12l-7 7M16 12l7 7M9 19v5M23 19v5" stroke="#ff6a3d" stroke-width="2.6" stroke-linecap="round" fill="none"/><circle cx="16" cy="6" r="2.6" fill="#ece4d6"/></svg>
+      AST-Query
+    </a>
+    <nav class="links">
+      <a href="#reference">Reference</a>
+      <a href="#install" class="hide-sm">Install</a>
+      <a href="https://github.com/chandana-galgali/AST-Query">GitHub ↗</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <h1>grep for the <em>shape</em><br>of Python code.</h1>
+    <p>AST-Query searches Python's abstract syntax tree with a small, readable query language, so you can find <code>every call to print</code> or <code>functions over 30 lines with no docstring</code> without writing a regex. This playground runs the real package in your browser.</p>
+  </section>
+
+  <div class="querybar" id="querybar">
+    <span class="prompt">astq ›</span>
+    <input id="query" spellcheck="false" autocomplete="off" aria-label="Query" value="find function where lines > 5">
+    <div class="qopts">
+      <button class="toggle" id="icase" aria-pressed="false" title="Case-insensitive comparisons (-i)">-i</button>
+      <button class="run" id="run" title="Run (Ctrl/⌘ + Enter)">Run</button>
+    </div>
+  </div>
+  <div class="qmeta">
+    <span id="qerror"></span>
+    <span class="status" id="status"><span class="dot"></span><span id="statusText">Loading Python…</span></span>
+  </div>
+
+  <div class="chips" id="chips"></div>
+
+  <div class="workspace">
+    <div class="pane">
+      <div class="pane-head">
+        <span class="title"><span class="dots"><i></i><i></i><i></i></span> example.py</span>
+        <span>
+          <button class="ghost" id="share" title="Copy a link to this query and code">share link</button>
+          <button class="ghost" id="reset" title="Restore the sample code">reset</button>
+        </span>
+      </div>
+      <div class="editor">
+        <div class="gutter" id="gutter"></div>
+        <div class="code-area">
+          <pre id="highlight" aria-hidden="true"></pre>
+          <textarea id="code" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Python source"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane">
+      <div class="pane-head">
+        <div class="tabs" role="tablist">
+          <button class="tab" role="tab" aria-selected="true" data-tab="matches">matches</button>
+          <button class="tab" role="tab" aria-selected="false" data-tab="ast">ast</button>
+        </div>
+        <span class="count" id="count"></span>
+      </div>
+      <div class="results" id="results"><div class="empty">Starting a Python runtime in your browser…<br>This takes a few seconds the first time.</div></div>
+      <pre class="astview" id="astview" hidden></pre>
+    </div>
+  </div>
+
+  <div class="cli-line"><span>$</span><code id="cliEquivalent"></code><button class="ghost" id="copyCli">copy</button></div>
+
+  <section class="ref" id="reference">
+    <div class="eyebrow">Reference</div>
+    <h2>The whole language fits on a card.</h2>
+    <div class="grid3">
+      <div class="card">
+        <h3>Syntax</h3>
+        <p><code>find &lt;types&gt; [where &lt;cond&gt; and &lt;cond&gt; …]</code></p>
+        <table>
+          <tr><td>=  !=</td><td>equals / differs (<code>==</code> works too)</td></tr>
+          <tr><td>~=  !~</td><td>regex search / no match</td></tr>
+          <tr><td>&lt; &lt;= &gt; &gt;=</td><td>numeric comparison</td></tr>
+          <tr><td>not attr</td><td>attribute is empty or false</td></tr>
+          <tr><td>a, b</td><td>several types (or <code>a or b</code>)</td></tr>
+          <tr><td>x.y.z</td><td>follow nested attributes</td></tr>
+        </table>
+        <p style="margin-top:12px">Values can be <code>'quoted'</code>, <code>"quoted"</code>, numbers or bare words. Attributes that hold AST nodes compare by their source, so <code>func = 'os.path.join'</code> just works. Lists match if <em>any</em> element matches.</p>
+      </div>
+      <div class="card">
+        <h3>Node types</h3>
+        <table>
+          <tr><td>function</td><td>FunctionDef, AsyncFunctionDef</td></tr>
+          <tr><td>class</td><td>ClassDef</td></tr>
+          <tr><td>call</td><td>Call</td></tr>
+          <tr><td>import</td><td>Import, ImportFrom</td></tr>
+          <tr><td>loop</td><td>For, AsyncFor, While</td></tr>
+          <tr><td>for_loop · while_loop</td><td>For / While</td></tr>
+          <tr><td>assign · return · raise</td><td>…and many more aliases</td></tr>
+          <tr><td>any</td><td>every node</td></tr>
+        </table>
+        <p style="margin-top:12px">Any class from Python's <code>ast</code> module works too, as <code>FunctionDef</code> or <code>function_def</code>, including abstract ones like <code>stmt</code> and <code>expr</code>.</p>
+      </div>
+      <div class="card">
+        <h3>Virtual attributes</h3>
+        <table>
+          <tr><td>lines</td><td>lines the node spans</td></tr>
+          <tr><td>argc</td><td>parameters / call arguments</td></tr>
+          <tr><td>docstring</td><td>module, class or function docstring</td></tr>
+          <tr><td>name</td><td>dotted name of a call: <code>os.path.join</code></td></tr>
+          <tr><td>source</td><td>the node's code</td></tr>
+          <tr><td>line · col · type</td><td>position and class name</td></tr>
+        </table>
+        <p style="margin-top:12px">Not sure what a node is called? Open the <b>ast</b> tab (or run <code>astq --dump file.py</code>) to see every node and attribute.</p>
+      </div>
+    </div>
+
+    <div class="install" id="install">
+      <div class="term"><span class="c"># install from GitHub (no dependencies)</span>
+<span class="p">$ </span>pip install git+https://github.com/chandana-galgali/AST-Query
+<span class="c"># search a whole project</span>
+<span class="p">$ </span>astq <span class="g">"find function where lines &gt; 40 and not docstring"</span> src/
+<span class="c"># script-friendly output</span>
+<span class="p">$ </span>astq --json <span class="g">"find call where func = 'eval'"</span> .
+<span class="p">$ </span>astq -c <span class="g">"find class where bases ~= 'Exception'"</span> .</div>
+      <div class="term"><span class="p">$ </span>astq <span class="g">"find call where func = 'print'"</span> .
+<span class="m">./app/cli.py</span>:<span class="g">42</span>:<span class="g">9</span>  <span class="y">Call</span>  <span class="h">print(f"Loaded {n} rows")</span>
+<span class="m">./app/db.py</span>:<span class="g">17</span>:<span class="g">5</span>   <span class="y">Call</span>  <span class="h">print("connecting…")</span>
+<span class="o">
+2 matches in 2 of 14 files</span>
+
+<span class="c"># or as a library</span>
+<span class="a" style="color:var(--blue)">from</span> ast_query <span style="color:var(--blue)">import</span> find
+<span style="color:var(--blue)">for</span> m <span style="color:var(--blue)">in</span> find(<span class="g">"find class"</span>, source):
+    print(m.line, m.code)</div>
+    </div>
+  </section>
+
+  <footer>
+    <span>AST-Query · MIT licensed · built on Python's <code>ast</code> module</span>
+    <span>Runs locally in your browser via <a href="https://pyodide.org">Pyodide</a>. Your code never leaves this page.</span>
+  </footer>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js"></script>
+<script>
+const SAMPLE = `import os
+from pathlib import Path
+
+
+class DataProcessor:
+    """Cleans and prints incoming records."""
+
+    def __init__(self, root):
+        self.root = Path(root)
+
+    def process(self, data):
+        if not data:
+            return None
+
+        for item in data:
+            print(f"Processing {item}")
+
+        return True
+
+    @staticmethod
+    def load(path, encoding="utf-8", strict=False, retries=3, timeout=10):
+        with open(os.path.join(path), encoding=encoding) as handle:
+            return handle.read()
+
+
+class ProcessingError(Exception):
+    pass
+
+
+def retry(fn, attempts=3):
+    for _ in range(attempts):
+        try:
+            return fn()
+        except ProcessingError as exc:
+            print("retrying after", exc)
+    raise ProcessingError("gave up")
+`;
+
+const EXAMPLES = [
+  ["functions with 3+ parameters", "find function where argc >= 3"],
+  ["calls to print", "find call where func = 'print'"],
+  ["a class by name", "find class where name = 'DataProcessor'"],
+  ["custom exceptions", "find class where bases = 'Exception'"],
+  ["undocumented functions", "find function where not docstring"],
+  ["static methods", "find function where decorator_list = 'staticmethod'"],
+  ["os.path calls", "find call where name ~= '^os\\.path'"],
+  ["loops", "find loop"],
+  ["long functions", "find function where lines > 5"],
+  ["imports", "find import"],
+];
+
+const PY_GLUE = `
+import ast, json
+from ast_query import find, parse_query, QuerySyntaxError
+
+def _offsets(source):
+    lines = source.split("\\n")
+    starts = [0]
+    for line in lines:
+        starts.append(starts[-1] + len(line) + 1)
+    return lines, starts
+
+def _char(lines, starts, line, col):
+    if line - 1 >= len(lines):
+        return starts[-1] - 1
+    text = lines[line - 1]
+    return starts[line - 1] + len(text.encode("utf-8")[:col].decode("utf-8", "ignore"))
+
+def run(query, source, ignore_case):
+    try:
+        q = parse_query(query)
+    except QuerySyntaxError as exc:
+        return json.dumps({"error": str(exc), "kind": "query"})
+    try:
+        matches = find(q, source, path="example.py", ignore_case=bool(ignore_case))
+    except SyntaxError as exc:
+        return json.dumps({"error": f"Python syntax error on line {exc.lineno}: {exc.msg}", "kind": "code", "line": exc.lineno})
+    lines, starts = _offsets(source)
+    out = []
+    for m in matches:
+        out.append({
+            "type": m.type, "line": m.line, "col": m.col + 1,
+            "start": _char(lines, starts, m.line, m.col),
+            "end": _char(lines, starts, m.end_line, m.end_col),
+            "code": m.code,
+        })
+    return json.dumps({"matches": out})
+
+def dump(query, source, ignore_case, index):
+    try:
+        if index is None or index < 0:
+            return ast.dump(ast.parse(source), indent=2)
+        m = find(query, source, ignore_case=bool(ignore_case))[index]
+        return ast.dump(m.node, indent=2)
+    except Exception as exc:
+        return f"# {exc}"
+`;
+
+const $ = (id) => document.getElementById(id);
+const queryEl = $("query"), codeEl = $("code"), hlEl = $("highlight"), gutterEl = $("gutter");
+const resultsEl = $("results"), astEl = $("astview"), countEl = $("count");
+let py = null, state = { matches: [], selected: -1, tab: "matches", icase: false };
+
+// ---------- helpers ----------
+const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("show"), 1600); }
+function b64e(s) { return btoa(String.fromCharCode(...new TextEncoder().encode(s))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+function b64d(s) { s = s.replace(/-/g, "+").replace(/_/g, "/"); return new TextDecoder().decode(Uint8Array.from(atob(s), c => c.charCodeAt(0))); }
+function shellQuote(s) { return s.includes('"') ? "'" + s.replace(/'/g, "'\\''") + "'" : '"' + s.replace(/([$`\\])/g, "\\$1") + '"'; }
+
+function setStatus(text, cls) { $("statusText").textContent = text; $("status").className = "status " + (cls || ""); }
+
+// ---------- editor rendering ----------
+function renderHighlight() {
+  const text = codeEl.value;
+  const ranges = state.matches.map((m, i) => ({ s: m.start, e: Math.max(m.end, m.start + 1), i }));
+  const points = new Set([0, text.length]);
+  ranges.forEach(r => { points.add(Math.min(r.s, text.length)); points.add(Math.min(r.e, text.length)); });
+  const sorted = [...points].sort((a, b) => a - b);
+  let html = "";
+  for (let k = 0; k < sorted.length - 1; k++) {
+    const a = sorted[k], b = sorted[k + 1];
+    if (a === b) continue;
+    const seg = esc(text.slice(a, b));
+    const covering = ranges.filter(r => r.s <= a && r.e >= b);
+    if (!covering.length) { html += seg; continue; }
+    const sel = covering.some(r => r.i === state.selected);
+    const depth = Math.min(covering.length, 3);
+    html += `<mark class="d${depth}${sel ? " sel" : ""}">${seg}</mark>`;
+  }
+  hlEl.innerHTML = html + "\n ";
+  const lineCount = text.split("\n").length;
+  const hitLines = new Set(state.matches.map(m => m.line));
+  let g = "";
+  for (let n = 1; n <= lineCount; n++) g += `<div${hitLines.has(n) ? ' class="hit"' : ""}>${n}</div>`;
+  gutterEl.innerHTML = g + "<div>&nbsp;</div>";
+  syncScroll();
+}
+function syncScroll() { hlEl.scrollTop = codeEl.scrollTop; hlEl.scrollLeft = codeEl.scrollLeft; gutterEl.scrollTop = codeEl.scrollTop; }
+codeEl.addEventListener("scroll", syncScroll);
+codeEl.addEventListener("keydown", (e) => {
+  if (e.key === "Tab") {
+    e.preventDefault();
+    const { selectionStart: s, selectionEnd: en } = codeEl;
+    codeEl.setRangeText("    ", s, en, "end");
+    schedule();
+  }
+});
+
+// ---------- results ----------
+function renderResults(error) {
+  countEl.textContent = error ? "" : `${state.matches.length} match${state.matches.length === 1 ? "" : "es"}`;
+  if (error) {
+    resultsEl.innerHTML = `<div class="empty">${esc(error)}</div>`;
+    return;
+  }
+  if (!state.matches.length) {
+    resultsEl.innerHTML = `<div class="empty">No matches.<br>Try <code>find any</code>, or open the <b>ast</b> tab to see what's in the tree.</div>`;
+    return;
+  }
+  resultsEl.innerHTML = state.matches.map((m, i) => {
+    const firstLines = m.code.split("\n").slice(0, 4).join("\n");
+    return `<div class="result${i === state.selected ? " sel" : ""}" data-i="${i}">
+      <span class="loc">${m.line}:${m.col}</span><span class="type">${m.type}</span>
+      <pre>${esc(firstLines)}</pre></div>`;
+  }).join("");
+}
+resultsEl.addEventListener("click", (e) => {
+  const row = e.target.closest(".result"); if (!row) return;
+  select(+row.dataset.i, true);
+});
+function select(i, scroll) {
+  state.selected = state.selected === i ? -1 : i;
+  renderHighlight(); renderResults();
+  if (state.tab === "ast") renderAst();
+  if (scroll && state.selected >= 0) {
+    const m = state.matches[i];
+    const lh = parseFloat(getComputedStyle(codeEl).lineHeight);
+    codeEl.scrollTop = Math.max(0, (m.line - 4) * lh);
+  }
+}
+
+// ---------- AST tab ----------
+function colorDump(s) {
+  return esc(s).replace(/('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")|\b([A-Z][A-Za-z]*)(?=\()|\b([a-z_][a-z_0-9]*)(?==)/g,
+    (m, str, kls, attr) => str ? `<span class="s">${str}</span>` : kls ? `<span class="k">${kls}</span>` : `<span class="a">${attr}</span>`);
+}
+function renderAst() {
+  if (!py) return;
+  const idx = state.selected;
+  const text = py.globals.get("dump")(queryEl.value, codeEl.value, state.icase, idx >= 0 ? idx : null);
+  const head = idx >= 0 ? `# AST of match ${idx + 1} (line ${state.matches[idx].line})\n` : "# AST of the whole file (select a match to focus on it)\n";
+  astEl.innerHTML = `<span style="color:var(--faint)">${esc(head)}</span>` + colorDump(text);
+}
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
+  state.tab = t.dataset.tab;
+  document.querySelectorAll(".tab").forEach(x => x.setAttribute("aria-selected", x === t));
+  resultsEl.hidden = state.tab !== "matches";
+  astEl.hidden = state.tab !== "ast";
+  if (state.tab === "ast") renderAst();
+}));
+
+// ---------- running ----------
+function updateCli() {
+  $("cliEquivalent").textContent = `astq ${state.icase ? "-i " : ""}${shellQuote(queryEl.value.trim())} example.py`;
+}
+function run() {
+  updateCli();
+  if (!py) return;
+  let res;
+  try { res = JSON.parse(py.globals.get("run")(queryEl.value, codeEl.value, state.icase)); }
+  catch (err) { res = { error: String(err), kind: "query" }; }
+  $("querybar").classList.toggle("error", res.kind === "query");
+  $("qerror").textContent = res.kind === "query" ? res.error : "";
+  if (res.error) {
+    state.matches = []; state.selected = -1;
+    renderHighlight();
+    renderResults(res.kind === "code" ? res.error : "Fix the query to see matches.");
+    return;
+  }
+  state.matches = res.matches;
+  if (state.selected >= state.matches.length) state.selected = -1;
+  renderHighlight(); renderResults();
+  if (state.tab === "ast") renderAst();
+}
+let timer;
+function schedule() { clearTimeout(timer); state.selected = -1; timer = setTimeout(run, 180); }
+queryEl.addEventListener("input", schedule);
+codeEl.addEventListener("input", () => { state.matches = []; renderHighlight(); schedule(); });
+queryEl.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); run(); } });
+document.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); run(); } });
+$("run").addEventListener("click", run);
+$("icase").addEventListener("click", () => { state.icase = !state.icase; $("icase").setAttribute("aria-pressed", state.icase); run(); });
+$("reset").addEventListener("click", () => { codeEl.value = SAMPLE; state.selected = -1; run(); renderHighlight(); });
+$("share").addEventListener("click", async () => {
+  const url = `${location.origin}${location.pathname}#q=${b64e(queryEl.value)}&c=${b64e(codeEl.value)}${state.icase ? "&i=1" : ""}`;
+  history.replaceState(null, "", url);
+  try { await navigator.clipboard.writeText(url); toast("Link copied"); } catch { toast("Link is in the address bar"); }
+});
+$("copyCli").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText($("cliEquivalent").textContent); toast("Command copied"); } catch { toast("Couldn't access the clipboard"); }
+});
+
+// chips
+$("chips").innerHTML = EXAMPLES.map(([label, q], i) => `<button class="chip" data-i="${i}" title="${esc(q)}"><b>${esc(label)}</b></button>`).join("");
+$("chips").addEventListener("click", (e) => {
+  const c = e.target.closest(".chip"); if (!c) return;
+  queryEl.value = EXAMPLES[+c.dataset.i][1]; state.selected = -1; run();
+});
+
+// ---------- boot ----------
+(function restoreFromHash() {
+  const params = new URLSearchParams(location.hash.slice(1));
+  try {
+    if (params.get("q")) queryEl.value = b64d(params.get("q"));
+    codeEl.value = params.get("c") ? b64d(params.get("c")) : SAMPLE;
+    if (params.get("i") === "1") { state.icase = true; $("icase").setAttribute("aria-pressed", "true"); }
+  } catch { codeEl.value = SAMPLE; }
+  renderHighlight(); updateCli();
+})();
+
+async function fetchPackage() {
+  const files = ["__init__.py", "query.py", "matcher.py", "parser.py"];
+  for (const base of ["./ast_query/", "../ast_query/"]) {
+    try {
+      const texts = await Promise.all(files.map(async f => {
+        const r = await fetch(base + f, { cache: "no-cache" });
+        if (!r.ok) throw new Error(r.status);
+        return r.text();
+      }));
+      return Object.fromEntries(files.map((f, i) => [f, texts[i]]));
+    } catch { /* try next location */ }
+  }
+  throw new Error("Couldn't load the ast_query package files. Serve the repository root (python -m http.server) and open /docs/.");
+}
+
+(async function boot() {
+  try {
+    const [pyodide, pkg] = await Promise.all([loadPyodide(), fetchPackage()]);
+    pyodide.FS.mkdirTree("/home/pyodide/ast_query");
+    for (const [name, text] of Object.entries(pkg)) pyodide.FS.writeFile(`/home/pyodide/ast_query/${name}`, text);
+    pyodide.runPython("import sys; sys.path.insert(0, '/home/pyodide')");
+    pyodide.runPython(PY_GLUE);
+    const version = pyodide.runPython("import sys, ast_query; f'Python {sys.version_info.major}.{sys.version_info.minor} · ast-query {ast_query.__version__}'");
+    py = pyodide;
+    setStatus(version + " · ready", "ready");
+    run();
+  } catch (err) {
+    console.error(err);
+    setStatus("Python failed to load", "failed");
+    resultsEl.innerHTML = `<div class="empty">${esc(String(err.message || err))}</div>`;
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ast-query"
+version = "1.0.0"
+description = "Query the abstract syntax tree of Python code with a small, readable query language."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Chandana Galgali" }]
+requires-python = ">=3.9"
+dependencies = []
+keywords = ["ast", "static-analysis", "code-search", "python", "query-language", "cli"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Utilities",
+]
+
+[project.urls]
+Homepage = "https://chandana-galgali.github.io/AST-Query/"
+Repository = "https://github.com/chandana-galgali/AST-Query"
+
+[project.scripts]
+astq = "ast_query.cli:main"
+ast-query = "ast_query.cli:main"
+
+[tool.setuptools]
+packages = ["ast_query"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "ast_query"]
+addopts = "--doctest-modules"
