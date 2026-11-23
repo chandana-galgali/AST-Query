@@ -7,7 +7,7 @@
 Search Python source by structure, not by text, with a query language small enough to remember.
 
 [![Tests](https://github.com/chandana-galgali/AST-Query/actions/workflows/tests.yml/badge.svg)](https://github.com/chandana-galgali/AST-Query/actions/workflows/tests.yml)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-3776ab.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776ab.svg)](https://www.python.org/downloads/)
 [![Zero dependencies](https://img.shields.io/badge/dependencies-0-success.svg)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 
@@ -214,7 +214,7 @@ python -m http.server 8000
 # then open http://localhost:8000/docs/
 ```
 
-GitHub Actions run the tests on Python 3.9 to 3.13 for every push. The playground is served by GitHub Pages from the `docs/` folder (**Settings → Pages → Deploy from a branch → `main` / `/docs`**). The page loads the `ast_query` package files from this repository through jsDelivr, so it always runs the code on `main`.
+GitHub Actions run the tests on Python 3.10 to 3.14 for every push. The playground is served by GitHub Pages from the `docs/` folder (**Settings → Pages → Deploy from a branch → `main` / `/docs`**). The page loads the `ast_query` package files from this repository through jsDelivr, so it always runs the code on `main`.
 
 ## Possible extensions
 
